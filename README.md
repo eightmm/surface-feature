@@ -24,6 +24,26 @@ faces = result.faces
 features = result.features
 ```
 
+### Accessing Feature Arrays
+
+```python
+from surface_feature import extract_surface_vertex_features_from_pdb
+
+result = extract_surface_vertex_features_from_pdb("path/to/protein.pdb")
+
+# Example: scalar feature (N,)
+shape_index = result.features["shape_index"]
+
+# Example: vector feature (N, 3)
+normals = result.features["vertex_normal"]
+
+# Example: one-hot feature (N, 20)
+res_type = result.features["residue_type"]
+
+# Example: PCA eigenvalues at radius 4.0 (N, 3)
+pca_eigs_r4 = result.features["pca_eigvals_r4.0"]
+```
+
 ## Options
 
 All options are keyword-only in `extract_surface_vertex_features_from_pdb`.
