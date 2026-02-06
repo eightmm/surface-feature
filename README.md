@@ -81,68 +81,37 @@ If you need more surface detail, increase `grid_density` and lower `target_face_
 
 ## Feature Keys
 
-Scalar features (one value per vertex):
+All features are vertex-aligned. Shapes below are per-vertex unless noted.
 
-- `shape_index`
-- `mean_curvature`
-- `gaussian_curvature`
-- `electrostatic`
-- `hydrophobicity`
-- `hbd`
-- `hba`
-- `molar_refractivity`
-- `aromaticity`
-- `pos_ionizable`
-- `neg_ionizable`
-- `convexity`
-- `is_backbone`
-- `b_factor`
-- `distance_to_centroid`
-- `neighbor_count_r{r}`
-- `local_area_r{r}`
-- `normal_var_r{r}`
-- `pca_eigvals_r{r}` (N, 3)
-- `pca_linearity_r{r}`
-- `pca_planarity_r{r}`
-- `pca_sphericity_r{r}`
-- `mean_curvature_r{r}`
-- `gaussian_curvature_r{r}`
-
-Vector / one-hot features:
-
-- `vertex_normal` (N, 3)
-- `residue_type` (N, 20)
-- `residue_atom_type` (N, 187)
-
-### Feature Descriptions
-
-- `shape_index`: normalized local shape descriptor from principal curvatures in `[-1, 1]`.
-- `mean_curvature`: mean curvature at each vertex.
-- `gaussian_curvature`: Gaussian curvature at each vertex.
-- `electrostatic`: charge/distance weighted potential (clipped to `[-2, 2]`).
-- `hydrophobicity`: residue-based hydrophobicity (protein).
-- `hbd`: hydrogen bond donor likelihood (0-1).
-- `hba`: hydrogen bond acceptor likelihood (0-1).
-- `molar_refractivity`: residue-level refractivity proxy (protein).
-- `aromaticity`: aromatic atom density (0-1).
-- `pos_ionizable`: positively ionizable density (0-1).
-- `neg_ionizable`: negatively ionizable density (0-1).
-- `convexity`: sign of mean curvature (concave/convex indicator).
-- `is_backbone`: backbone atom density (protein only).
-- `b_factor`: normalized B-factor density (protein only).
-- `distance_to_centroid`: Euclidean distance from vertex to surface centroid.
-- `neighbor_count_r{r}`: number of vertices within radius `r`.
-- `local_area_r{r}`: sum of vertex areas within radius `r`.
-- `normal_var_r{r}`: variance of vertex normals within radius `r`.
-- `pca_eigvals_r{r}`: normalized eigenvalues of local covariance (3 values).
-- `pca_linearity_r{r}`: `(λ1-λ2)/λ1` from local PCA.
-- `pca_planarity_r{r}`: `(λ2-λ3)/λ1` from local PCA.
-- `pca_sphericity_r{r}`: `λ3/λ1` from local PCA.
-- `mean_curvature_r{r}`: mean curvature measured at radius `r`.
-- `gaussian_curvature_r{r}`: Gaussian curvature measured at radius `r`.
-- `vertex_normal`: unit normal vector at vertex.
-- `residue_type`: one-hot amino acid type (protein only).
-- `residue_atom_type`: one-hot residue+atom token (protein only, 187 classes).
+| Key | Shape | Description |
+| --- | --- | --- |
+| `shape_index` | `(N,)` | Normalized local shape descriptor from principal curvatures in `[-1, 1]`. |
+| `mean_curvature` | `(N,)` | Mean curvature at each vertex. |
+| `gaussian_curvature` | `(N,)` | Gaussian curvature at each vertex. |
+| `electrostatic` | `(N,)` | Charge/distance weighted potential (clipped to `[-2, 2]`). |
+| `hydrophobicity` | `(N,)` | Residue-based hydrophobicity. |
+| `hbd` | `(N,)` | Hydrogen bond donor likelihood (0-1). |
+| `hba` | `(N,)` | Hydrogen bond acceptor likelihood (0-1). |
+| `molar_refractivity` | `(N,)` | Residue-level refractivity proxy. |
+| `aromaticity` | `(N,)` | Aromatic atom density (0-1). |
+| `pos_ionizable` | `(N,)` | Positively ionizable density (0-1). |
+| `neg_ionizable` | `(N,)` | Negatively ionizable density (0-1). |
+| `convexity` | `(N,)` | Sign of mean curvature (concave/convex indicator). |
+| `is_backbone` | `(N,)` | Backbone atom density. |
+| `b_factor` | `(N,)` | Normalized B-factor density. |
+| `distance_to_centroid` | `(N,)` | Distance from vertex to surface centroid. |
+| `neighbor_count_r{r}` | `(N,)` | Number of vertices within radius `r`. |
+| `local_area_r{r}` | `(N,)` | Sum of vertex areas within radius `r`. |
+| `normal_var_r{r}` | `(N,)` | Variance of vertex normals within radius `r`. |
+| `pca_eigvals_r{r}` | `(N, 3)` | Normalized eigenvalues of local covariance. |
+| `pca_linearity_r{r}` | `(N,)` | `(λ1-λ2)/λ1` from local PCA. |
+| `pca_planarity_r{r}` | `(N,)` | `(λ2-λ3)/λ1` from local PCA. |
+| `pca_sphericity_r{r}` | `(N,)` | `λ3/λ1` from local PCA. |
+| `mean_curvature_r{r}` | `(N,)` | Mean curvature measured at radius `r`. |
+| `gaussian_curvature_r{r}` | `(N,)` | Gaussian curvature measured at radius `r`. |
+| `vertex_normal` | `(N, 3)` | Unit normal vector at vertex. |
+| `residue_type` | `(N, 20)` | One-hot amino acid type. |
+| `residue_atom_type` | `(N, 187)` | One-hot residue+atom token. |
 
 ## Dependencies
 
