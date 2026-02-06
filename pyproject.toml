@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.24.2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "surface-feature"
+version = "0.1.0"
+description = "Single-file PDB surface featurizer with vertex-wise features"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "surface-feature" }]
+license = { text = "MIT" }
+
+dependencies = [
+  "numpy>=1.24",
+  "open3d>=0.18",
+  "torch>=2.0",
+  "rdkit>=2023.9.1",
+  "scipy>=1.10",
+  "scikit-image>=0.21",
+  "trimesh>=4.0",
+]
+
+[project.urls]
+Repository = "https://github.com/eightmm/surface-feature"
+
+[tool.hatch.build.targets.wheel]
+include = ["surface_feature.py"]
