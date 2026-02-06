@@ -32,14 +32,14 @@ All options are keyword-only in `extract_surface_vertex_features_from_pdb`.
 | Option | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `is_ligand` | `bool` | `False` | If `True`, uses ligand feature logic (Gasteiger charges, RDKit chemical features). If `False`, uses protein logic (residue-based features). |
-| `grid_density` | `float` | `2.5` | Grid points per Angstrom for marching cubes. Higher = finer surface, slower. |
-| `threshold` | `float` | `0.5` | Isosurface threshold in the scalar field. |
+| `grid_density` | `float` | `2.5` | Grid points per Angstrom for marching cubes. Higher = finer surface, slower and higher memory use. |
+| `threshold` | `float` | `0.5` | Isosurface threshold in the scalar field. Lower = larger surface, higher = tighter surface. |
 | `sharpness` | `float` | `1.5` | Controls Gaussian sharpness. Higher = sharper surface closer to VdW radii. |
 | `simplify` | `bool` | `True` | Whether to simplify the mesh using QEM. |
 | `target_face_area` | `float` | `1.0` | Target face area in Å² when simplifying. Lower = more faces. |
-| `min_faces` | `int` | `100` | Minimum faces after simplification. |
-| `max_faces` | `int \| None` | `None` | Cap faces after simplification. |
-| `feature_radii` | `tuple[float, ...]` | `(2.0, 4.0, 6.0)` | Radii (Å) for multi-scale curvature and local neighborhood stats. |
+| `min_faces` | `int` | `100` | Minimum faces after simplification (safety floor). |
+| `max_faces` | `int \| None` | `None` | Cap faces after simplification (safety ceiling). |
+| `feature_radii` | `tuple[float, ...]` | `(2.0, 4.0, 6.0)` | Radii (Å) for multi-scale curvature and local neighborhood stats. Larger radii capture global shape, smaller radii capture local detail. |
 
 Example with tuned mesh resolution:
 
@@ -55,6 +55,15 @@ result = extract_surface_vertex_features_from_pdb(
     feature_radii=(2.0, 4.0),
 )
 ```
+
+## Option Interactions
+
+- `simplify=False`: `target_face_area`, `min_faces`, and `max_faces` are ignored because the mesh is not simplified.
+- `grid_density` vs `target_face_area`: `grid_density` controls surface sampling during marching cubes; `target_face_area` controls post-simplification density. If you increase `grid_density`, you can usually increase `target_face_area` to keep runtime reasonable.
+- `threshold` vs `sharpness`: higher `sharpness` makes the scalar field steeper, so small changes in `threshold` have stronger effects. If you increase `sharpness`, keep `threshold` near `0.5`.
+- `feature_radii`: affects only local statistics and multi-scale curvature. It does not change the mesh itself.
+
+None of the options are mutually exclusive; they are designed to compose. The only “ignore” behavior is when `simplify=False`.
 
 ## Protein-Only Recommended Settings
 
@@ -76,7 +85,7 @@ If you need more surface detail, increase `grid_density` and lower `target_face_
 
 ## Feature Keys
 
-Scalar features:
+Scalar features (one value per vertex):
 
 - `shape_index`
 - `mean_curvature`
@@ -112,18 +121,38 @@ Vector / one-hot features:
 - `atom_type` (N, 6)
 - `residue_type` (N, 20)
 
-## More MaSIF-like Additions (Suggestions)
+### Feature Descriptions
 
-If you want this closer to MaSIF v1/v2 behavior, these are the highest value additions:
-
-- Geodesic patch sampling around each vertex (radius R) and compute aggregated descriptors per patch.
-- Use mesh geodesic distances instead of Euclidean distances when building local neighborhoods.
-- Compute curvature at multiple radii (multi-scale) for better local shape context.
-- Add distance-to-pocket-center or distance-to-ligand-surface features for binding site tasks.
-- Add surface roughness or local area density within a geodesic ball.
-- Add atom-level electrostatics via Poisson-Boltzmann or APBS-derived grids (optional).
-
-If you want any of these, tell me which items to implement first and the target runtime constraints.
+- `shape_index`: normalized local shape descriptor from principal curvatures in `[-1, 1]`.
+- `mean_curvature`: mean curvature at each vertex.
+- `gaussian_curvature`: Gaussian curvature at each vertex.
+- `electrostatic`: charge/distance weighted potential (clipped to `[-2, 2]`).
+- `hydrophobicity`: residue-based hydrophobicity (protein) or logP contribution (ligand).
+- `hbd`: hydrogen bond donor likelihood (0-1).
+- `hba`: hydrogen bond acceptor likelihood (0-1).
+- `molar_refractivity`: atomic refractivity contribution (ligand) or zeros (protein).
+- `aromaticity`: aromatic atom density (0-1).
+- `pos_ionizable`: positively ionizable density (0-1).
+- `neg_ionizable`: negatively ionizable density (0-1).
+- `convexity`: sign of mean curvature (concave/convex indicator).
+- `hybridization`: weighted hybridization class (ligand only).
+- `in_ring`: weighted ring membership (ligand only).
+- `ring_size`: weighted ring size (ligand only).
+- `is_backbone`: backbone atom density (protein only).
+- `b_factor`: normalized B-factor density (protein only).
+- `distance_to_centroid`: Euclidean distance from vertex to surface centroid.
+- `neighbor_count_r{r}`: number of vertices within radius `r`.
+- `local_area_r{r}`: sum of vertex areas within radius `r`.
+- `normal_var_r{r}`: variance of vertex normals within radius `r`.
+- `pca_eigvals_r{r}`: normalized eigenvalues of local covariance (3 values).
+- `pca_linearity_r{r}`: `(λ1-λ2)/λ1` from local PCA.
+- `pca_planarity_r{r}`: `(λ2-λ3)/λ1` from local PCA.
+- `pca_sphericity_r{r}`: `λ3/λ1` from local PCA.
+- `mean_curvature_r{r}`: mean curvature measured at radius `r`.
+- `gaussian_curvature_r{r}`: Gaussian curvature measured at radius `r`.
+- `vertex_normal`: unit normal vector at vertex.
+- `atom_type`: one-hot atom class (ligand only).
+- `residue_type`: one-hot amino acid type (protein only).
 
 ## Dependencies
 
