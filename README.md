@@ -44,6 +44,44 @@ res_type = result.features["residue_type"]
 pca_eigs_r4 = result.features["pca_eigvals_r4.0"]
 ```
 
+### Using `verts`, `faces`, `normals`
+
+These three arrays define the surface mesh:
+
+- `verts`: vertex positions `(N, 3)` in Angstroms.
+- `faces`: triangle indices `(F, 3)` into `verts`.
+- `normals`: unit normals `(N, 3)` at each vertex.
+
+Example: compute triangle areas from the mesh.
+
+```python
+import numpy as np
+from surface_feature import extract_surface_vertex_features_from_pdb
+
+result = extract_surface_vertex_features_from_pdb("path/to/protein.pdb")
+v = result.verts
+f = result.faces
+
+v0 = v[f[:, 0]]
+v1 = v[f[:, 1]]
+v2 = v[f[:, 2]]
+areas = 0.5 * np.linalg.norm(np.cross(v1 - v0, v2 - v0), axis=1)
+```
+
+Example: create an Open3D mesh for visualization.
+
+```python
+import open3d as o3d
+from surface_feature import extract_surface_vertex_features_from_pdb
+
+result = extract_surface_vertex_features_from_pdb("path/to/protein.pdb")
+
+mesh = o3d.geometry.TriangleMesh()
+mesh.vertices = o3d.utility.Vector3dVector(result.verts)
+mesh.triangles = o3d.utility.Vector3iVector(result.faces)
+mesh.vertex_normals = o3d.utility.Vector3dVector(result.normals)
+```
+
 ## Options
 
 All options are keyword-only in `extract_surface_vertex_features_from_pdb`.
