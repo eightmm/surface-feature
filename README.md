@@ -1,6 +1,6 @@
 # surface-feature
 
-Single-file PDB surface featurizer. It builds a molecular surface from a PDB file and computes vertex-wise MaSIF-style features.
+Single-file PDB protein surface featurizer. It builds a protein surface from a PDB file and computes vertex-wise features.
 
 ## Install (uv)
 
@@ -17,7 +17,6 @@ from surface_feature import extract_surface_vertex_features_from_pdb
 
 result = extract_surface_vertex_features_from_pdb(
     "path/to/protein.pdb",
-    is_ligand=False,
 )
 
 verts = result.verts
@@ -31,7 +30,6 @@ All options are keyword-only in `extract_surface_vertex_features_from_pdb`.
 
 | Option | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `is_ligand` | `bool` | `False` | If `True`, uses ligand feature logic (Gasteiger charges, RDKit chemical features). If `False`, uses protein logic (residue-based features). |
 | `grid_density` | `float` | `2.5` | Grid points per Angstrom for marching cubes. Higher = finer surface, slower and higher memory use. |
 | `threshold` | `float` | `0.5` | Isosurface threshold in the scalar field. Lower = larger surface, higher = tighter surface. |
 | `sharpness` | `float` | `1.5` | Controls Gaussian sharpness. Higher = sharper surface closer to VdW radii. |
@@ -46,7 +44,6 @@ Example with tuned mesh resolution:
 ```python
 result = extract_surface_vertex_features_from_pdb(
     "path/to/protein.pdb",
-    is_ligand=False,
     grid_density=3.0,
     sharpness=2.0,
     simplify=True,
@@ -72,7 +69,6 @@ These defaults work well for protein surface representation without external too
 ```python
 result = extract_surface_vertex_features_from_pdb(
     "path/to/protein.pdb",
-    is_ligand=False,
     grid_density=2.5,
     sharpness=1.5,
     simplify=True,
@@ -99,9 +95,6 @@ Scalar features (one value per vertex):
 - `pos_ionizable`
 - `neg_ionizable`
 - `convexity`
-- `hybridization`
-- `in_ring`
-- `ring_size`
 - `is_backbone`
 - `b_factor`
 - `distance_to_centroid`
@@ -118,8 +111,8 @@ Scalar features (one value per vertex):
 Vector / one-hot features:
 
 - `vertex_normal` (N, 3)
-- `atom_type` (N, 6)
 - `residue_type` (N, 20)
+- `residue_atom_type` (N, 187)
 
 ### Feature Descriptions
 
@@ -127,17 +120,14 @@ Vector / one-hot features:
 - `mean_curvature`: mean curvature at each vertex.
 - `gaussian_curvature`: Gaussian curvature at each vertex.
 - `electrostatic`: charge/distance weighted potential (clipped to `[-2, 2]`).
-- `hydrophobicity`: residue-based hydrophobicity (protein) or logP contribution (ligand).
+- `hydrophobicity`: residue-based hydrophobicity (protein).
 - `hbd`: hydrogen bond donor likelihood (0-1).
 - `hba`: hydrogen bond acceptor likelihood (0-1).
-- `molar_refractivity`: atomic refractivity contribution (ligand) or zeros (protein).
+- `molar_refractivity`: residue-level refractivity proxy (protein).
 - `aromaticity`: aromatic atom density (0-1).
 - `pos_ionizable`: positively ionizable density (0-1).
 - `neg_ionizable`: negatively ionizable density (0-1).
 - `convexity`: sign of mean curvature (concave/convex indicator).
-- `hybridization`: weighted hybridization class (ligand only).
-- `in_ring`: weighted ring membership (ligand only).
-- `ring_size`: weighted ring size (ligand only).
 - `is_backbone`: backbone atom density (protein only).
 - `b_factor`: normalized B-factor density (protein only).
 - `distance_to_centroid`: Euclidean distance from vertex to surface centroid.
@@ -151,8 +141,8 @@ Vector / one-hot features:
 - `mean_curvature_r{r}`: mean curvature measured at radius `r`.
 - `gaussian_curvature_r{r}`: Gaussian curvature measured at radius `r`.
 - `vertex_normal`: unit normal vector at vertex.
-- `atom_type`: one-hot atom class (ligand only).
 - `residue_type`: one-hot amino acid type (protein only).
+- `residue_atom_type`: one-hot residue+atom token (protein only, 187 classes).
 
 ## Dependencies
 
