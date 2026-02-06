@@ -181,19 +181,21 @@ def compute_all_vertex_features(
     atom_positions: np.ndarray,
     mol: Chem.Mol,
     is_ligand: bool = True,
+    feature_radii: Tuple[float, ...] = (2.0, 4.0, 6.0),
 ) -> Dict[str, np.ndarray]:
     """Compute MaSIF-style surface features at each vertex (vertex-based)."""
     n_verts = len(verts)
 
+    # Precompute normals/mesh
     try:
         mesh = trimesh.Trimesh(vertices=verts, faces=faces, process=False)
-        radius = 1.5
+        base_radius = 1.5
 
         mean_curv = trimesh.curvature.discrete_mean_curvature_measure(
-            mesh, mesh.vertices, radius=radius
+            mesh, mesh.vertices, radius=base_radius
         )
         gauss_curv = trimesh.curvature.discrete_gaussian_curvature_measure(
-            mesh, mesh.vertices, radius=radius
+            mesh, mesh.vertices, radius=base_radius
         )
 
         k_sum = mean_curv * 2
@@ -325,6 +327,82 @@ def compute_all_vertex_features(
     vertex_normals = mesh.vertex_normals
     convexity = np.sign(mean_curv)
 
+    # Protein-only local geometric features (no external tools)
+    # These are still computed for ligand too (useful), but most meaningful for protein surfaces.
+    from scipy.spatial import cKDTree
+
+    tree = cKDTree(verts)
+    # Per-vertex area (sum 1/3 of adjacent face areas)
+    v0 = verts[faces[:, 0]]
+    v1 = verts[faces[:, 1]]
+    v2 = verts[faces[:, 2]]
+    face_areas = 0.5 * np.linalg.norm(np.cross(v1 - v0, v2 - v0), axis=1)
+    vertex_area = np.zeros(n_verts, dtype=np.float32)
+    np.add.at(vertex_area, faces[:, 0], face_areas / 3.0)
+    np.add.at(vertex_area, faces[:, 1], face_areas / 3.0)
+    np.add.at(vertex_area, faces[:, 2], face_areas / 3.0)
+
+    # Distance to centroid (simple global context)
+    centroid = verts.mean(axis=0)
+    dist_to_centroid = np.linalg.norm(verts - centroid, axis=1)
+
+    # Multi-scale neighborhood stats
+    local_stats: Dict[str, np.ndarray] = {}
+    for r in feature_radii:
+        # Indices for each vertex within radius r
+        neighborhoods = tree.query_ball_point(verts, r)
+
+        neighbor_count = np.array([len(nb) for nb in neighborhoods], dtype=np.float32)
+        # Local area density: sum of vertex areas in neighborhood / neighborhood size
+        local_area = np.zeros(n_verts, dtype=np.float32)
+        normal_var = np.zeros(n_verts, dtype=np.float32)
+        pca_eigvals = np.zeros((n_verts, 3), dtype=np.float32)
+        pca_linearity = np.zeros(n_verts, dtype=np.float32)
+        pca_planarity = np.zeros(n_verts, dtype=np.float32)
+        pca_sphericity = np.zeros(n_verts, dtype=np.float32)
+
+        for i, nb in enumerate(neighborhoods):
+            if not nb:
+                continue
+            nb = np.array(nb, dtype=np.int32)
+            local_area[i] = vertex_area[nb].sum()
+            nbs = vertex_normals[nb]
+            normal_var[i] = np.mean(np.var(nbs, axis=0))
+            if nb.size >= 3:
+                pts = verts[nb] - verts[i]
+                cov = (pts.T @ pts) / max(1, pts.shape[0])
+                w = np.linalg.eigvalsh(cov)
+                w = np.sort(w)[::-1]
+                s = w.sum()
+                if s > 0:
+                    w = w / s
+                pca_eigvals[i] = w
+                if w[0] > 0:
+                    pca_linearity[i] = (w[0] - w[1]) / w[0]
+                    pca_planarity[i] = (w[1] - w[2]) / w[0]
+                    pca_sphericity[i] = w[2] / w[0]
+
+        local_stats[f"neighbor_count_r{r}"] = neighbor_count
+        local_stats[f"local_area_r{r}"] = local_area
+        local_stats[f"normal_var_r{r}"] = normal_var
+        local_stats[f"pca_eigvals_r{r}"] = pca_eigvals
+        local_stats[f"pca_linearity_r{r}"] = pca_linearity
+        local_stats[f"pca_planarity_r{r}"] = pca_planarity
+        local_stats[f"pca_sphericity_r{r}"] = pca_sphericity
+
+    # Multi-scale curvature (optional but cheap relative to surface gen)
+    multi_curv: Dict[str, np.ndarray] = {}
+    try:
+        for r in feature_radii:
+            m = trimesh.curvature.discrete_mean_curvature_measure(mesh, mesh.vertices, radius=r)
+            g = trimesh.curvature.discrete_gaussian_curvature_measure(mesh, mesh.vertices, radius=r)
+            multi_curv[f"mean_curvature_r{r}"] = m
+            multi_curv[f"gaussian_curvature_r{r}"] = g
+    except Exception:
+        for r in feature_radii:
+            multi_curv[f"mean_curvature_r{r}"] = np.zeros(n_verts)
+            multi_curv[f"gaussian_curvature_r{r}"] = np.zeros(n_verts)
+
     if is_ligand:
         atom_type_map = {6: 0, 7: 1, 8: 2, 16: 3, 9: 4, 17: 4, 35: 4, 53: 4}
         atom_types = np.array([atom_type_map.get(a.GetAtomicNum(), 5) for a in mol.GetAtoms()])
@@ -430,6 +508,9 @@ def compute_all_vertex_features(
         "residue_type": vertex_residue_type,
         "is_backbone": vertex_backbone,
         "b_factor": vertex_bfactor,
+        "distance_to_centroid": dist_to_centroid,
+        **local_stats,
+        **multi_curv,
     }
 
 
@@ -444,6 +525,7 @@ def extract_surface_vertex_features_from_pdb(
     target_face_area: float = 1.0,
     min_faces: int = 100,
     max_faces: int | None = None,
+    feature_radii: Tuple[float, ...] = (2.0, 4.0, 6.0),
 ) -> SurfaceFeatures:
     """Build surface and compute vertex features from a PDB file."""
     mol = _mol_from_pdb(pdb_path)
@@ -477,6 +559,7 @@ def extract_surface_vertex_features_from_pdb(
         positions,
         mol,
         is_ligand=is_ligand,
+        feature_radii=feature_radii,
     )
 
     return SurfaceFeatures(verts=verts, faces=faces, normals=normals, features=features)
