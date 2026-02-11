@@ -446,6 +446,17 @@ def compute_all_vertex_features(
             multi_curv[f"mean_curvature_r{r}"] = np.zeros(n_verts)
             multi_curv[f"gaussian_curvature_r{r}"] = np.zeros(n_verts)
 
+    # Atom type (element) one-hot encoding
+    element_list = ["C", "N", "O", "S", "P", "H", "Other"]
+    elem_to_idx = {elem: i for i, elem in enumerate(element_list)}
+    atom_type_onehot = np.zeros((mol.GetNumAtoms(), len(element_list)))
+    for atom in mol.GetAtoms():
+        elem = atom.GetSymbol().strip().upper()
+        idx = elem_to_idx.get(elem, elem_to_idx["Other"])
+        atom_type_onehot[atom.GetIdx(), idx] = 1.0
+    vertex_atom_type = weights @ atom_type_onehot
+
+    # Residue type (amino acid) one-hot encoding
     aa_list = [
         "ALA",
         "ARG",
